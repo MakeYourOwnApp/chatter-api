@@ -1,0 +1,96 @@
+<!doctype html>
+<html>
+
+<head>
+    <title>Test</title>
+    <script src="https://code.jquery.com/jquery-3.1.0.min.js"></script>
+    <script src="https://cdn.socket.io/socket.io-1.4.5.js"></script>
+    <style>
+        .expires {
+            margin-left:16px;
+            font-weight:bold;
+        }
+        .dying {
+            color:red;
+        }
+    </style>
+
+    <script>
+        var socket = io();
+
+        var posts = {};
+
+        $(function () {
+            $.get( "/channels", function( data ) {
+                for (i in data) {
+                    $('<li>').text(data[i]).appendTo('#channels');
+                }
+            });
+        });
+
+        //Create new post
+        function post() {
+            var channel = $('#channel').val();
+            var message = {
+                text: $('#message').val(),
+                longitude: 1,
+                latitude: 2,
+                creator: "fewest.slime.hurt"
+            };
+            $.post("/channels/"+channel, message);
+        }
+
+        //Extend post
+        function coddle(post) {
+            var postId = post.created + "." + post.creator;
+            $.ajax("/posts/"+postId, {method: "PUT"});
+        }
+
+        /*socket.on('/channels/create', function(channel){
+            $('<li>').text(channel.time).appendTo('#channels');
+        });*/
+        socket.on('expire', function(postId){
+            if (posts[postId]) {
+                posts[postId].element.remove();
+                delete posts[postId];
+            }
+        });
+        socket.on('post', function(post) {
+            //Reference post
+            posts[post.created + "." + post.creator] = post;
+            //Create element
+            var element = $('<li>').text(post.text);
+            $('<span>').addClass('expires').text("15 s").click(function(){
+                coddle(post);
+            }).appendTo(element);
+            //Link element
+            element.appendTo('#posts');
+            post.element = element;
+        });
+        socket.on('extend', function(post) {
+            posts[post.id].expires = post.expires;
+            posts[post.id].element.children().filter(".expires").removeClass('dying');
+        });
+        //Update ttl
+        window.setInterval(function(){
+            var now = Date.now();
+            for (postId in posts) {
+                var post = posts[postId];
+                var ttl = Math.round((post.expires - now) / 1000);
+                post.element.children().filter(".expires").text(ttl + " s").addClass((ttl > 5) ? "" : "dying");
+            }
+        }, 100)
+    </script>
+</head>
+<body>
+
+<h2>Chatrooms</h2>
+#<input type="text" id="channel" placeholder="channel"/>
+<input type="text" id="message" placeholder="message"/>
+<button onclick="post();">Post</button>
+<ul id="posts">
+
+</ul>
+
+</body>
+</html>

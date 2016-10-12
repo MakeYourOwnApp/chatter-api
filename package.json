@@ -1,0 +1,26 @@
+{
+  "name": "chatter-api",
+  "version": "1.0.0",
+  "description": "This is the server backend for MYOA",
+  "main": "index.js",
+  "scripts": {
+    "Run API!": "node index.js"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/InteractionPrototyping/Chatter-API.git"
+  },
+  "author": "Markus Zimmermann",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/InteractionPrototyping/Chatter-API/issues"
+  },
+  "homepage": "https://github.com/InteractionPrototyping/Chatter-API#readme",
+  "dependencies": {
+    "bluebird": "^3.4.6",
+    "body-parser": "^1.15.2",
+    "express": "^4.14.0",
+    "redis": "^2.6.2",
+    "socket.io": "^1.4.8"
+  }
+}
