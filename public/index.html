@@ -18,79 +18,170 @@
     <script>
         var socket = io();
 
-        var posts = {};
+        var messages = {};
+        var activeChannel;
 
         $(function () {
-            $.get( "/channels", function( data ) {
+            getChannels();
+        });
+
+        /********************
+         *     Channels     *
+         *******************/
+        // Appends new channel to DOM.
+        function createChannelElement(channel) {
+            // Create element and append to container.
+            var elm = $('<li>').text(channel.name);
+            elm.appendTo('#channels');
+            // Register click event.
+            elm.on('click', function() {
+                setActiveChannel(channel);
+                getMessages(channel.id);
+            });
+        }
+
+        function setActiveChannel(channel) {
+            activeChannel = channel;
+            // Leave old channel.
+            socket.emit('channel:leave', activeChannel);
+            // Join new channel.
+            socket.emit('channel:join', channel.id);
+            // Update channel in UI.
+            $('#active-channel').text(channel.name);
+        }
+
+        // Get all channels.
+        function getChannels() {
+            $.get('/channels', function(data) {
+                console.log(data);
                 for (i in data) {
-                    $('<li>').text(data[i]).appendTo('#channels');
+                    createChannelElement(data[i]);
                 }
             });
+        }
+
+        // Create new channel.
+        function postChannel() {
+            var elm = $('#channel');
+            if(elm.val()) {
+                var channel = {
+                    name: elm.val(),
+                    createdBy: 'fewest.slime.hurt'
+                };
+                $.post('/channels/', channel);
+                // Reset input.
+                elm.val('');
+            }
+        }
+
+        // New channel was created.
+        socket.on('channel:new', function(channel){
+            createChannelElement(channel);
         });
 
-        //Create new post
-        function post() {
-            var channel = $('#channel').val();
-            var message = {
-                text: $('#message').val(),
-                longitude: 1,
-                latitude: 2,
-                creator: "fewest.slime.hurt"
+        /********************
+         *     Messages     *
+         *******************/
+        // Appends new message to DOM.
+        function createMessageElement(message) {
+            // Create message element and append to container.
+            var elm = $('<li>').text(message.text);
+            // Add counter and register click event.
+            $('<span>').addClass('expires').text('15 s').click(function() {
+                coddleMessage(activeChannel, message.id);
+            }).appendTo(elm);
+
+            elm.appendTo('#messages');
+
+            // Save message in global dictionary.
+            messages[message.id] = {
+                message: message,
+                element: elm
             };
-            $.post("/channels/"+channel, message);
         }
 
-        //Extend post
-        function coddle(post) {
-            var postId = post.created + "." + post.creator;
-            $.ajax("/posts/"+postId, {method: "PUT"});
+        // Get all messages by channelId.
+        function getMessages(channelId) {
+            console.log('GETMESSAGES');
+            messages = {};
+            $.get('/channels/' + channelId + '/messages', function(data) {
+                console.log(data);
+                $('#messages').empty();
+                for (i in data) {
+                    createMessageElement(data[i]);
+                }
+            });
         }
 
-        /*socket.on('/channels/create', function(channel){
-            $('<li>').text(channel.time).appendTo('#channels');
-        });*/
-        socket.on('expire', function(postId){
-            if (posts[postId]) {
-                posts[postId].element.remove();
-                delete posts[postId];
+        // Create new message.
+        function postMessage() {
+            var elm = $('#message');
+            if(activeChannel && elm.val()) {
+                var message = {
+                    text: elm.val(),
+                    channel: activeChannel.id,
+                    createdBy: 'fewest.slime.hurt'
+                };
+                $.post('/channels/' + message.channel + '/messages', message);
+                // Reset input.
+                elm.val('');
+            }
+        }
+
+        // Extend message.
+        function coddleMessage(channelId, messageId) {
+            $.ajax('/channels/'+ channelId + '/messages/' + messageId, {method: 'PUT'});
+        }
+
+        // New message was created.
+        socket.on('message:new' , function(message) {
+            createMessageElement(message);
+        });
+
+        // Messages expired.
+        socket.on('expire', function(messageId){
+            if (messages[messageId]) {
+                messages[messageId].element.remove();
+                delete messages[messageId];
             }
         });
-        socket.on('post', function(post) {
-            //Reference post
-            posts[post.created + "." + post.creator] = post;
-            //Create element
-            var element = $('<li>').text(post.text);
-            $('<span>').addClass('expires').text("15 s").click(function(){
-                coddle(post);
-            }).appendTo(element);
-            //Link element
-            element.appendTo('#posts');
-            post.element = element;
+
+        // Message was extended
+        socket.on('message:extend', function(message) {
+            if (messages[message.id]) {
+                messages[message.id].message.expiresOn = message.expiresOn;
+                messages[message.id].element.find('.expires').removeClass('dying');
+            }
         });
-        socket.on('extend', function(post) {
-            posts[post.id].expires = post.expires;
-            posts[post.id].element.children().filter(".expires").removeClass('dying');
-        });
-        //Update ttl
+
+        // Update TTL
         window.setInterval(function(){
             var now = Date.now();
-            for (postId in posts) {
-                var post = posts[postId];
-                var ttl = Math.round((post.expires - now) / 1000);
-                post.element.children().filter(".expires").text(ttl + " s").addClass((ttl > 5) ? "" : "dying");
+            for (var i in messages) {
+                var message = messages[i];
+                var ttl = Math.round((message.message.expiresOn - now) / 1000);
+                message.element.find('.expires').text(ttl + ' s').addClass((ttl > 5) ? '' : 'dying');
             }
-        }, 100)
+        }, 100);
+
     </script>
 </head>
 <body>
 
 <h2>Chatrooms</h2>
-#<input type="text" id="channel" placeholder="channel"/>
-<input type="text" id="message" placeholder="message"/>
-<button onclick="post();">Post</button>
-<ul id="posts">
+<ul id="channels">
 
 </ul>
+#<input type="text" id="channel" placeholder="channel"/>
+<button onclick="postChannel();">Create Channel</button>
+<br><br>
+<h2>Messages in <span id="active-channel"></span></h2>
+<ul id="messages">
+
+</ul>
+<input type="text" id="message" placeholder="message"/>
+<button onclick="postMessage();">Create Message</button>
+<br><br>
 
 </body>
 </html>

@@ -7,136 +7,64 @@
  * TODO: register Ex events in config
  */
 
-//Helpers
-var Promise = require("bluebird"); //Promise API
+// Import all configurations from .env file.
+const dotenv = require('dotenv').load();
 
-//Express server
+// Initialize Express Server.
 var express = require('express');
 var app = express();
+
+// Initialize HTTP server.
 var http = require('http').Server(app);
 
-//Json
+// Initialize the logger.
+var logger = require('./Services/LogService')(app).loggerForEnvironment(process.env.PORT);
+
+// Initialize Body Parser.
 var bodyParser = require('body-parser');
-app.use(bodyParser.urlencoded()); // Middleware for parsing application/json
+app.use(bodyParser.urlencoded({ extended : false })); // Middleware for parsing application/json
 
-//Socket server
-var io = require('socket.io')(http);
+// Initialize the Redis Store.
+var redisStore = require('./Services/RedisStore')(logger);
+// Initialize the Socket Service.
+var socket = require('./Services/SocketClientService')(http, redisStore, logger);
+// Initialize the Redis Event Subscriber.
+var redisSubscriber = require('./Services/RedisSubscriber')(redisStore, socket, logger);
 
-//Redis storage
-var redis = require("redis");
-Promise.promisifyAll(redis.RedisClient.prototype);
-Promise.promisifyAll(redis.Multi.prototype);
-var r = redis.createClient();
-var subscriber = redis.createClient();
-const EVENT_EXPIRED = '__keyevent@0__:expired';
 
-app.get('/channels', function (req, res) {
-    r.smembersAsync("channels")
-        .then(function (channelsSet) {
-            res.writeHead(200, {'Content-Type': 'application/json'});
-            res.write("["); //start array
-            return channelsSet; //resolve promise
-        })
-        .each(function (channelName, index, length) {
-            return r.hgetallAsync("channels:" + channelName).then(function (channel) {
-                res.write(JSON.stringify(channel)); //Add object
-                if (index < length - 1) res.write(","); //Concatenate objects
-            });
-        })
-        .finally(function () {
-            res.write("]"); //end array
-            res.end(); //close stream
-        });
-});
+// Initialize method override. This will allow to use PUT and DELETE options also at clients which normally don't support them.
+app.use(require('method-override')());
 
-app.get('/channels/:name', function (req, res) {
-    res.send('hello ' + req.params.name + '!');
-});
+// Add HTTP headers.
+app.use(function(req, res, next) {
 
-app.post('/channels/:channel', function (req, res) {
-    var channel = req.params.channel;
-    var post = req.body;
+    // Websites you wish to allow to connect.
+    res.header('Access-Control-Allow-Origin', '*');
 
-    //Sanity checks
-    if (!post.text || !post.longitude || !post.latitude || !post.creator) {
-        res.status(400).send('Post incomplete, has to contain "text", "longitude", "latitude", and "creator"');
-        return;
+    // Request methods you wish to allow.
+    res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, OPTIONS');
+
+    // Request headers you wish to allow.
+    res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept');
+
+    // If OPTIONS return immediately.
+    if (req.method === 'OPTIONS') {
+        return res.sendStatus(200);
     }
 
-    /*//Store in channels set todo: ordered set by date
-     r.sadd("channels", name);
-     //Store channel in hash
-     r.hmsetAsync("channels:" + name, {
-     name: name,
-     time: Date.now(),
-     creator: 'fewest.slime.hurt'
-     }).then(function () {
-     r.expire("channels:" + name, 15)
-     }).finally(function () {
-     res.sendStatus(200);
-     io.emit('/channels/create', name);
-     });*/
-
-    //Add timestamp and channel
-    post.created = Date.now();
-    post.expires = post.created + 15000;
-    post.channel = channel;
-
-    //Create post
-    r.multi() //Start atomic transactions
-        .hmset('posts:' + post.created + "." + post.creator, post)
-        .expire('posts:' + post.created + "." + post.creator, 15)
-        .execAsync() //Execute atomic transactions
-        .then(function (result) {
-            res.sendStatus(200);
-            io.emit('post', post);
-        })
-        .error(function (error) {
-            res.status(500).send(err);
-        });
+    // Pass to next layer of middleware.
+    next();
 });
 
-app.put('/posts/:postId', function (req, res) {
-    //Extend lifetime
-    var postKey = "posts:" + req.params.postId;
+// Initialize Public Routes which do not require authentication.
+app.use('/', require('./Services/PostProcessor.js')(socket, logger), require('./Routes/Routes.js')(redisStore, redisSubscriber, logger));
 
-    r.ttlAsync(postKey) //Read time to live
-        .bind({}) //Initialize a new (empty) this object for data exchange between all promises
-        .then(function (ttl) {
-            //Calculate and store new duration
-            this.ttl = Number(ttl) + 5;
-            return r.expireAsync(postKey, this.ttl);
-        })
-        .then(function () {
-            //Calculate new expiration
-            this.expires = Date.now() + (this.ttl * 1000);
-            return r.hsetAsync(postKey, 'expires', this.expires);
-        })
-        .then(function () {
-            //Broadcast new expiration
-            io.emit('extend', {id: req.params.postId, expires: this.expires});
-            //OK
-            res.sendStatus(200);
-        })
-        .error(function(){
-            res.status(500).send(err);
-        });
-});
-
-subscriber.on('pmessage', function (pattern, event, msg) {
-    if (event == EVENT_EXPIRED) {
-        var item = msg.split(":")[1];
-        //console.log('expired', item);
-        //r.srem("channels", item);
-        io.emit('expire', item);
-    }
-});
-subscriber.psubscribe(EVENT_EXPIRED);
-
-//Static web server
+// Static web server.
 app.use(express.static('public'));
 
-//Start web server
-http.listen(3131, function () {
-    console.log('listening on *:3131');
+// Get server port from .env
+const port = process.env.PORT || 3100;
+// Start web server.
+http.listen(port, function () {
+    logger.info('Server listening on *:' + port);
 });
