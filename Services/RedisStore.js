@@ -12,10 +12,10 @@ module.exports = function (logger) {
     Promise.promisifyAll(redis.RedisClient.prototype);
     Promise.promisifyAll(redis.Multi.prototype);
     const redisdb = process.env.REDISDB || 1;
-    // Select database 1.
-    store.select(1, function(err,res){
+    // Select database.
+    //store.select(redisdb, function(err,res){
         logger.info('RedisStore running on db ' + redisdb);
-    });
+    //});
 
     return store;
 };

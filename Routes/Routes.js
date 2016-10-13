@@ -67,7 +67,7 @@ module.exports = function (redisStore, redisSub, logger) {
                 logger.info('POST Channel:', channel);
                 // Append channel to request for post processing.
                 req.channel = channel;
-                return res.sendStatus(100);
+                return res.sendStatus(201);
                 //io.emit('post', post);
             })
             .error(function (error) {
@@ -122,7 +122,7 @@ module.exports = function (redisStore, redisSub, logger) {
                 logger.info('POST Message:', message);
                 // Append message to request for post processing.
                 req.message = message;
-                return res.sendStatus(100);
+                return res.sendStatus(201);
             })
             .error(function (error) {
                 logger.error('POST Message:', error);
