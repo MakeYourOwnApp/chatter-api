@@ -7,7 +7,6 @@ var _ = require('lodash');
 var path = require('path');
 var gulp = require('gulp');
 var debug = require('gulp-debug');
-var jshint = require('gulp-jshint');
 var fs = require('fs');
 var gulpSSH = require('gulp-ssh')({
 	ignoreErrors : true,
@@ -15,19 +14,19 @@ var gulpSSH = require('gulp-ssh')({
 		host : 'tumwlfe-mooc.srv.mwn.de',
 		port : 22,
 		username : 'root',
-		privateKey : fs.readFileSync('../deployment_rsa')
+		privateKey : fs.readFileSync('./deployment_rsa')
 	}
 });
-var deployment_path = '/data/node';
+var deployment_path = '/data/chatter';
 
 /**
  *  Files which should be used in the lint phase.
  */
 var lintFiles = [
+	'public/**/*.html',
 	'Routes/**/*.js',
 	'Services/**/*.js',
-	'Models/**/*.js',
-	'server.js'
+	'index.js'
 ];
 
 
@@ -58,13 +57,11 @@ gulp.task('release', ['lint'], function(cb) {
  *  Check for JavaScript errors.
  */
 gulp.task('lint', function(cb) {
-	return gulp.src(lintFiles)
-		.pipe(jshint())
-		.pipe(jshint.reporter('default'));
+	return gulp.src(lintFiles);
 });
 
-gulp.task('deploy-node', ['release'], function() {
+gulp.task('deploy-chatter', ['release'], function() {
 	console.log("IMPORTANT: YOU HAVE TO BE CONNECTED TO THE MWN VPN");
-	console.log("*** Deploying Server ***");
+	console.log("*** Deploying Chatter API Server ***");
 	return gulp.src('Release/**/*').pipe(gulpSSH.dest(deployment_path));
 });
