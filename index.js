@@ -16,16 +16,16 @@ var app = express();
 
 // Read certificate.
 const fs = require('fs');
-const pkey = fs.readFileSync('/root/mooc.key');
-const pcert = fs.readFileSync('/root/cert-7835386732846228.pem');
-const options = {
-    key : pkey,
-    cert : pcert
-};
+// const pkey = fs.readFileSync('/root/mooc.key');
+// const pcert = fs.readFileSync('/root/cert-7835386732846228.pem');
+// const options = {
+//     key : pkey,
+//     cert : pcert
+// };
 
 // Initialize HTTPS server.
-//var https = require('http').Server(app); // For local development
-var https = require('https').createServer(options, app);
+var https = require('http').Server(app); // For local development
+//var https = require('https').createServer(options, app);
 
 
 // Initialize the logger.

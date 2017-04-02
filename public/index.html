@@ -19,7 +19,8 @@
     </style>
 
     <script>
-        var socket = io();
+        var serverUrl = 'https://tumwlfe-mooc.srv.mwn.de:3131';
+        var socket = io(serverUrl);
 
         var messages = {};
         var channels = {};
@@ -65,7 +66,7 @@
 
         // Get all channels.
         function getChannels() {
-            $.get('/channels', function(data) {
+            $.get(serverUrl + '/channels', function(data) {
                 console.log('Channels', data);
                 for (i in data) {
                     createChannelElement(data[i]);
@@ -81,7 +82,7 @@
                     name: elm.val(),
                     createdBy: 'fewest.slime.hurt'
                 };
-                $.post('/channels/', channel);
+                $.post(serverUrl + '/channels/', channel);
                 // Reset input.
                 elm.val('');
             }
@@ -133,7 +134,7 @@
         // Get all messages by channelId.
         function getMessages(channelId) {
             messages = {};
-            $.get('/channels/' + channelId + '/messages', function(data) {
+            $.get(serverUrl + '/channels/' + channelId + '/messages', function(data) {
                 console.log('Messages', data);
                 $('#messages').empty();
                 for (i in data) {
@@ -151,14 +152,14 @@
                     channel: activeChannel.id,
                     createdBy: 'fewest.slime.hurt'
                 };
-                $.post('/channels/' + message.channel + '/messages', message);
+                $.post(serverUrl + '/channels/' + message.channel + '/messages', message);
                 elm.val('');
             }
         }
 
         // Extend message.
         function coddleMessage(channelId, messageId) {
-            $.ajax('/channels/'+ channelId + '/messages/' + messageId, {method: 'PUT'});
+            $.ajax(serverUrl + '/channels/'+ channelId + '/messages/' + messageId, {method: 'PUT'});
         }
 
         // New message was created.

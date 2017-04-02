@@ -201,8 +201,7 @@ module.exports = function (redisStore, redisSub, logger) {
     router.put('/channels/:channelId/messages/:messageId', function (req, res, next) {
         //Extend lifetime
         var messageId = req.params.messageId;
-        console.log(messageId);
-
+        // TODO: Extend Channel
         redisStore.ttlAsync(messageId) //Read time to live
             .bind({}) //Initialize a new (empty) this object for data exchange between all promises
             .then(function (ttl) {
@@ -224,7 +223,7 @@ module.exports = function (redisStore, redisSub, logger) {
                 };
                 return res.sendStatus(200);
             })
-            .error(function(){
+            .error(function(err){
                 return res.status(500).send(err);
             });
     });
